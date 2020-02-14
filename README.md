@@ -83,7 +83,7 @@ some_json = """
 print(model(some_json))
 ```
 
-HOne thing to be aware of is that json2vec dynamically instantiates parameters when new data paths are encountered. Hence, care should be taken to ensure all parameters are added to the in-built pytorch optimisers. In practice, one can usually get around this by constructing the optimiser after the initial test of the model, as all relevant data will have been seen by the network.
+One thing to be aware of is that json2vec dynamically instantiates parameters when new data paths are encountered. Hence, care should be taken to ensure all parameters are added to the in-built pytorch optimisers. In practice, one can usually get around this by constructing the optimiser after the initial test of the model, as all relevant data will have been seen by the network.
 
 
 To tailor the architecture to a given dataset, `json2vec_v2.py` can be used. It allows setting of path-specific function overrides, so you can set different functions for different parts of the data. Paths are given in JSONPath style format, e.g.
@@ -119,6 +119,6 @@ Experiment code can be run using `hparam_tuning_uci.py` and `hparam_tuning_poker
 
 `uci_test.py` and `uci_test_v2.py` can be run with command line arguments for single runs.
 
-The data in `uci_data` is the same data as downloaded from the UCI repository, however, some files have been reformatted to enable easy loading. All rebalancing, and conversion to both JSON and feature vector formats.
+The data in `uci_data` is the same data as downloaded from the UCI repository, however, some files have been reformatted to enable easy loading. All rebalancing, and conversion to both JSON and feature vector formats are done on-the-fly via the `datasets.py` script.
 
 Experiment code for reinforcement learning code will be included at a later date.
