@@ -1,7 +1,7 @@
 import csv
 import numpy as np
 import json
-import scipy.misc
+#import scipy.misc
 import tqdm
 
 from json2vec import JSONTreeLSTM, SetJSONNN
@@ -122,7 +122,7 @@ def run_once(dataset="car", model_type='json-nn', seed=123, epochs=None, lr=0.00
 
         
 
-
+    print(dataset)
     print(model_type)
     np.random.seed(seed)
     num_classes = 1 if regression else len(encoder.classes_)
@@ -236,5 +236,38 @@ def run_once(dataset="car", model_type='json-nn', seed=123, epochs=None, lr=0.00
 
 
 if __name__ == "__main__":
-    print(run_once(model_type='json-nn', dataset='nursery', batch_size=4,
-        lr=0.00025, epochs=50, poker_frac_test=None, test=True))
+
+    import argparse
+    parser = argparse.ArgumentParser()
+
+    parser.add_argument('--dataset', type=str, default="car",
+                       help='Dataset to use, choices are:' + \
+                       'car, nursery, seismic,  poker, mushroom, contraceptive, automobile, bank, student')
+    parser.add_argument('--model', type=str, default="json-nn",
+                       help='Model to use, choices are: mlp, json-nn, set-nn-max')
+
+    parser.add_argument('--test', action='store_true',
+                       help='Set to use helf-out test set')
+
+    parser.add_argument('--learning_rate', type=float, default=0.00025,
+                       help='Learning rate')
+    parser.add_argument('--batch_size', type=int, default=128,
+                       help='Effective batch size')
+    parser.add_argument('--num_epoch', type=int, default=4,
+                       help='Number of iterations over full dataset')
+                       
+    parser.add_argument('--dataset_fraction', type=float, default=0.05,
+                       help='Fraction of dataset to use (only valid for poker dataset)')
+
+   
+    args = parser.parse_args()
+
+
+    if args.dataset == 'poker':
+        print(run_once(model_type=args.model, dataset='poker', batch_size=args.batch_size,
+            lr=args.learning_rate, epochs=args.num_epoch, poker_frac_test=args.dataset_fraction,
+            test=args.test))
+    else:
+        print(run_once(model_type=args.model, dataset=args.dataset, batch_size=args.batch_size,
+            lr=args.learning_rate, epochs=args.num_epoch, poker_frac_test=None,
+            test=args.test))

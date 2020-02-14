@@ -4,154 +4,6 @@ import numpy as np
 import pandas as pd
 from tqdm import tqdm
 
-def load_twitter_dataset(seed=123, restrict=True, use_original_dataset=False, rebuild=False):
-
-    orig_data = pd.read_csv("gender-classifier-DFE-791531.csv",encoding="latin1")
-
-    if use_original_dataset:
-        data = orig_data
-    
-    else:
-
-        # Load JSON entries
-        if rebuild:
-            # Place API calls to twitter
-            from TwitterAPI import TwitterAPI
-            from twitter_api_keys import api_keys
-
-            # Using OAuth 1.0 to authenticate you have access all Twitter endpoints.
-            api = TwitterAPI(*api_keys, auth_type='oAuth1')
-
-            tot_users = 20000
-            responses = []
-            for i in range(0, tot_users, 100):
-                tranch = ",".join(ids[i:i+100])
-                r = api.request('users/lookup', {'screen_name': tranch})
-                j = r.response.json()
-                responses += j
-                print(i)
-            with open('twitter_data.json', 'w') as outfile:
-                json.dump(responses, outfile)
-
-        else:
-            json_data = open('twitter_data.json').read()
-            responses = json.loads(json_data)
-            
-        # Get the gender information from the original data
-        gender = dict(zip(orig_data['name'].tolist(),
-                          orig_data['gender'].tolist()))
-        gender_confidence = dict(zip(orig_data['name'].tolist(),
-                                     orig_data['gender:confidence'].tolist()))
-
-
-        # get raw data fields from responses
-        data = {}
-        data['json'] = responses
-        data['screen_name'] = [ r.get('screen_name') for r in responses ]
-        data['description'] = [ r.get('description') for r in responses ]
-        data['text'] = [ "" if r.get('status') is None else r.get('status').get('text') for r in responses ]
-
-        data['gender'] = [ gender.get(d) for d in data['screen_name'] ]
-        data['gender:confidence'] = [ gender_confidence.get(d) for d in data['screen_name'] ]
-        
-        data = pd.DataFrame(data)
-
-    if restrict:
-        # Restrict to gender/brand (no unknowns or missing)
-        data = data[data['gender'].isin(['female', 'male', 'brand'])]
-
-        # Get only where gender confidence is 1
-        data = data[data['gender:confidence'] == 1]
-
-    print("Loaded JSON dataset")
-    print(" "*8 + "Class Split")
-    for c in ['female', 'male', 'brand']:
-        num_c = len(data[data['gender'] == c])
-        print("{:>8} {:d}/{:d} ({:2.2f}%)".format(c+':', num_c, len(data),
-            num_c / len(data) * 100))
-
-    np.random.seed(123)
-    inds = np.arange(len(data))
-    np.random.shuffle(inds)
-    tranche_size = len(data) // 10
-
-    test_bool = np.zeros(len(data))
-    test_bool[inds[:tranche_size]] = 1.
-    data['test_set'] = test_bool
-
-    valid_bool = np.zeros(len(data))
-    valid_bool[inds[tranche_size:tranche_size*2]] = 1.
-    data['validation_set'] = valid_bool
-
-    return data
-
-
-
-
-def load_webpages_dataset(restrict=True, rebuild=False, retest=False):
-    # Load CSV
-    data = pd.read_csv("URL-categorization-DFE.csv", encoding="latin1")
-
-    if rebuild:
-        import os
-        import subprocess
-        from multiprocessing import Pool
-        urls = data['url']
-
-        def get_page(url):
-            returned_value = subprocess.call("wget -O webpages/{} --timeout=10 --tries=2 {}".format(url, url), shell=True)
-            return (url, returned_value)
-
-        with Pool() as p:
-            r = list(tqdm(p.imap_unordered(get_page, urls), total=len(urls)))
-        
-        with open('webpages/return_codes.pickle', 'wb') as file:
-            pickle.dump(r, file, protocol=pickle.HIGHEST_PROTOCOL)
-        
-    if retest:
-        from multiprocessing import Pool
-        from XHTMLTreeParser import string2xml
-        def test_file(url):
-            try:
-                with open('webpages/{}'.format(url), 'rb') as file:
-                    inputs = file.read().decode("utf-8", errors="ignore")
-                outputs = string2xml(inputs)
-                return (url, 1)
-            except Exception as error:
-                return (url, 0)
-
-        urls = data['url']
-        with Pool() as p:
-            r = list(tqdm(p.imap_unordered(test_file, urls), total=len(urls)))
-        with open('webpages/valid_files.pickle', 'wb') as file:
-            pickle.dump(r, file, protocol=pickle.HIGHEST_PROTOCOL)
-            
-        print("Encountered {} errors".format(len(errors)))
-
-    # Add return codes
-    with open('webpages/return_codes.pickle', 'rb') as file:
-        return_codes = pickle.load(file)
-    data['return_code'] = data['url'].map(dict(return_codes))
-
-    # Add checked information
-    with open('webpages/valid_files.pickle', 'rb') as file:
-        valid_files = pickle.load(file)
-    data['valid_xml'] = data['url'].map(dict(valid_files))
-
-    if restrict:
-        # Get only non-empty files
-        data = data[data['return_code'] == 0]
-
-        # Get only files which pass validation in our parser
-        data = data[data['valid_xml'] == 1]#[:1000]
-
-        # Get only pages labelled as working
-        #df = df[df['main_category'] != 'Not_working']
-
-    return data
-
-
-
 
 def load_car_dataset(fix_schema=False):
     jsons = []
@@ -1168,6 +1020,68 @@ def load_shopping_dataset(balance=True):
     return jsons, vectors, labels
 
 
+
+def load_webpages_dataset(restrict=True, rebuild=False, retest=False):
+    # Load CSV
+    data = pd.read_csv("URL-categorization-DFE.csv", encoding="latin1")
+
+    if rebuild:
+        import os
+        import subprocess
+        from multiprocessing import Pool
+        urls = data['url']
+
+        def get_page(url):
+            returned_value = subprocess.call("wget -O webpages/{} --timeout=10 --tries=2 {}".format(url, url), shell=True)
+            return (url, returned_value)
+
+        with Pool() as p:
+            r = list(tqdm(p.imap_unordered(get_page, urls), total=len(urls)))
+        
+        with open('webpages/return_codes.pickle', 'wb') as file:
+            pickle.dump(r, file, protocol=pickle.HIGHEST_PROTOCOL)
+        
+    if retest:
+        from multiprocessing import Pool
+        from XHTMLTreeParser import string2xml
+        def test_file(url):
+            try:
+                with open('webpages/{}'.format(url), 'rb') as file:
+                    inputs = file.read().decode("utf-8", errors="ignore")
+                outputs = string2xml(inputs)
+                return (url, 1)
+            except Exception as error:
+                return (url, 0)
+
+        urls = data['url']
+        with Pool() as p:
+            r = list(tqdm(p.imap_unordered(test_file, urls), total=len(urls)))
+        with open('webpages/valid_files.pickle', 'wb') as file:
+            pickle.dump(r, file, protocol=pickle.HIGHEST_PROTOCOL)
+            
+        print("Encountered {} errors".format(len(errors)))
+
+    # Add return codes
+    with open('webpages/return_codes.pickle', 'rb') as file:
+        return_codes = pickle.load(file)
+    data['return_code'] = data['url'].map(dict(return_codes))
+
+    # Add checked information
+    with open('webpages/valid_files.pickle', 'rb') as file:
+        valid_files = pickle.load(file)
+    data['valid_xml'] = data['url'].map(dict(valid_files))
+
+    if restrict:
+        # Get only non-empty files
+        data = data[data['return_code'] == 0]
+
+        # Get only files which pass validation in our parser
+        data = data[data['valid_xml'] == 1]#[:1000]
+
+        # Get only pages labelled as working
+        #df = df[df['main_category'] != 'Not_working']
+
+    return data
 
 
 from collections import defaultdict
